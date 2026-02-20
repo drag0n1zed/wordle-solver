@@ -1,0 +1,21 @@
+{
+  "word_len": 8,
+  "val": [
+    { "color": "Yellow", "char": 97 },
+    { "color": "Gray", "char": 114 },
+    { "color": "Gray", "char": 116 },
+    { "color": "Green", "char": 105 },
+    { "color": "Gray", "char": 115 },
+    { "color": "Gray", "char": 116 },
+    { "color": "Yellow", "char": 105 },
+    { "color": "Yellow", "char": 99 },
+    { "color": "Gray", "char": 111 },
+    { "color": "Gray", "char": 102 },
+    { "color": "Gray", "char": 102 },
+    { "color": "Green", "char": 105 },
+    { "color": "Yellow", "char": 99 },
+    { "color": "Green", "char": 105 },
+    { "color": "Green", "char": 97 },
+    { "color": "Yellow", "char": 108 }
+  ]
+}

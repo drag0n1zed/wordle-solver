@@ -78,6 +78,8 @@ fn main() {
             },
         ],
     };
+    let serialized = serde_json::to_string(&history).unwrap();
+    println!("{}", serialized);
     let reqs: Requirement = history.into();
     for word in reqs.filter_wordlist(&wordlist).take(100) {
         println!("{}", word);

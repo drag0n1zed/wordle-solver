@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en-US">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width" />
+        <title>Wordle solver</title>
+    </head>
+    <body>
+        <img src="assets/img/pfp.png" alt="drag's pfp" />
+        <script type="module">
+            import init, { add } from "./pkg/wordle_solver.js";
+
+            async function run() {
+                await init();
+
+                const result = add(1, 2);
+                console.log(`1 + 2 = ${result}`);
+                if (result !== 3)
+                    throw new Error("wasm addition doesn't work!");
+            }
+
+            run();
+        </script>
+    </body>
+</html>
