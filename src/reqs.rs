@@ -75,7 +75,7 @@ impl Requirement {
         true
     }
 
-    pub fn filter_wordlist<'a>(&self, wordlist_file: &'a str) -> impl Iterator<Item = &'a str> {
-        wordlist_file.lines().filter(|word| self.applies_to(word))
+    pub fn filter_wordlist<'a>(&self, wordlist: &'a str) -> impl Iterator<Item = &'a str> {
+        wordlist.lines().filter(|word| self.applies_to(word))
     }
 }
