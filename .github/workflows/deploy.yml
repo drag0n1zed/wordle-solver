@@ -20,7 +20,7 @@ jobs:
       - name: install trunk
         run: wget -qO- https://github.com/trunk-rs/trunk/releases/latest/download/trunk-x86_64-unknown-linux-gnu.tar.gz | tar -xzf-
       - name: build
-        run: ./trunk build --release --public-url ${{ github.event.repository.name }}
+        run: ./trunk build --release --public-url "/${{ github.event.repository.name }}/"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
