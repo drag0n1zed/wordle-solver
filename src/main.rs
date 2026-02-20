@@ -91,9 +91,7 @@ fn main() -> Result<(), JsValue> {
     let possible_word = reqs.filter_wordlist(wordlist).next().unwrap();
 
     leptos::mount::mount_to_body(move || {
-        view! {
-            <p>"Word: " {possible_word}</p>
-        }
+        view! { <p>"Word: " {possible_word}</p> }
     });
 
     Ok(())

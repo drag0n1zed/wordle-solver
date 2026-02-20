@@ -1,0 +1,8 @@
+[rustfmt]
+overrideCommand = ["leptosfmt", "--stdin", "--rustfmt"]
+
+[cargo]
+features = "all"
+
+[procMacro]
+ignored = { "leptos_macro" = ["server", "component"] }
