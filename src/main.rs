@@ -1,12 +1,20 @@
-use std::fs;
+mod guess;
+mod reqs;
 
-use wordle_solver::{
+use crate::{
     guess::{CharGuess, GuessType, Guesses},
     reqs::Requirement,
 };
 
-fn main() {
-    let wordlist = fs::read_to_string("assets/enable1.txt").unwrap();
+use leptos::prelude::*;
+use wasm_bindgen::prelude::*;
+
+fn main() -> Result<(), JsValue> {
+    console_error_panic_hook::set_once();
+
+    const WORDLIST_BYTES: &[u8] = include_bytes!("../assets/data/enable1.txt");
+    let wordlist = unsafe { std::str::from_utf8_unchecked(WORDLIST_BYTES) };
+
     let history = Guesses {
         word_len: 8,
         val: vec![
@@ -78,10 +86,15 @@ fn main() {
             },
         ],
     };
-    let serialized = serde_json::to_string(&history).unwrap();
-    println!("{}", serialized);
+
     let reqs: Requirement = history.into();
-    for word in reqs.filter_wordlist(&wordlist).take(100) {
-        println!("{}", word);
-    }
+    let possible_word = reqs.filter_wordlist(wordlist).next().unwrap();
+
+    leptos::mount::mount_to_body(move || {
+        view! {
+            <p>"Word: " {possible_word}</p>
+        }
+    });
+
+    Ok(())
 }
