@@ -1,4 +1,4 @@
-use crate::guess::{CharGuess, GuessType, Guesses};
+use crate::logic::guess::{CharGuess, GuessType, Guesses};
 
 pub struct Requirement {
     word_len: usize,                   // Word length
