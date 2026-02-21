@@ -1,4 +1,4 @@
-use crate::logic::guess::{CharGuess, GuessType, Guesses};
+use crate::logic::guess::{GuessColor, Guesses, LetterGuess};
 
 pub struct Requirement {
     word_len: usize,                   // Word length
@@ -21,18 +21,18 @@ impl From<Guesses> for Requirement {
         for chunk in item.val.chunks(word_len) {
             let mut chunk_min_counts = [0; 26];
             for (pos, guess) in chunk.iter().enumerate() {
-                let CharGuess { color, char } = guess;
-                let idx = (char - b'a') as usize;
+                let LetterGuess { color, char } = guess;
+                let idx = (char - b'A') as usize;
                 match color {
-                    GuessType::Green => {
+                    GuessColor::Green => {
                         reqs.must_be[pos] = Some(*char);
                         chunk_min_counts[idx] += 1;
                     }
-                    GuessType::Yellow => {
+                    GuessColor::Yellow => {
                         reqs.must_not_be[pos].push(*char);
                         chunk_min_counts[idx] += 1;
                     }
-                    GuessType::Gray => {
+                    GuessColor::Gray => {
                         reqs.must_not_be[pos].push(*char);
                         reqs.exact_counts[idx] = Some(chunk_min_counts[idx]);
                     }
@@ -52,7 +52,7 @@ impl Requirement {
             return false;
         }
         let mut char_counts = [0; 26];
-        for (pos, char) in word.bytes().map(|b| b.to_ascii_lowercase()).enumerate() {
+        for (pos, char) in word.bytes().map(|b| b.to_ascii_uppercase()).enumerate() {
             if let Some(must_exist_char) = self.must_be[pos]
                 && char != must_exist_char
             {
@@ -60,7 +60,7 @@ impl Requirement {
             } else if self.must_not_be[pos].contains(&char) {
                 return false;
             }
-            char_counts[(char - b'a') as usize] += 1;
+            char_counts[(char - b'A') as usize] += 1;
         }
         for i in 0..26 {
             let char_count = char_counts[i];

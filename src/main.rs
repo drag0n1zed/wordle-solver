@@ -12,5 +12,6 @@ fn main() -> Result<(), JsValue> {
     leptos::mount::mount_to_body(move || {
         view! { <App /> }
     });
+
     Ok(())
 }
