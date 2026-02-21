@@ -5,7 +5,10 @@ use leptos::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::HtmlInputElement;
 
-use crate::logic::guess::GuessColor;
+use crate::logic::{
+    guess::{GuessColor, Guesses},
+    reqs::Requirement,
+};
 
 static ASSETS: Dir = include_dir!("$CARGO_MANIFEST_DIR/assets");
 
@@ -25,8 +28,6 @@ pub struct Tile {
 
 #[component]
 pub fn App() -> impl IntoView {
-    let wordlist = get_str_asset("data/enable1.txt").expect("wordlist load failed");
-
     let rows = RwSignal::new(3);
     let cols = RwSignal::new(5);
 
@@ -43,6 +44,26 @@ pub fn App() -> impl IntoView {
             }
         })
     });
+
+    let wordlist = get_str_asset("data/enable1.txt").expect("wordlist load failed");
+
+    let is_solvable = Memo::new(move |_| {
+        grid.get()
+            .iter()
+            .flatten()
+            .all(|tile| tile.char.is_some() && tile.color.is_some())
+    });
+
+    let all_solutions = RwSignal::new(Vec::<&str>::new());
+    let display_count = RwSignal::new(20);
+
+    let solve = move || {
+        let guesses = Guesses::from_grid(grid.get(), cols.get()).expect("tiles should be filled but aren't");
+        let reqs: Requirement = guesses.into();
+        let results: Vec<&str> = reqs.filter_wordlist(wordlist).collect();
+        all_solutions.set(results);
+        display_count.set(20);
+    };
 
     enum MoveDir {
         Left,
@@ -133,9 +154,6 @@ pub fn App() -> impl IntoView {
 
     let cycle_status = move |row: usize, col: usize| {
         grid.update(|g| {
-            if g[row][col].char.is_none() {
-                return;
-            }
             g[row][col].color = match g[row][col].color {
                 None => Some(GuessColor::Gray),
                 Some(GuessColor::Gray) => Some(GuessColor::Yellow),
@@ -155,15 +173,15 @@ pub fn App() -> impl IntoView {
                     Some(byte) => (byte as char).to_string(),
                 }
                 class=move || {
-                    let base = "w-12 h-12 sm:w-16 sm:h-16 border-2 \
-                        border-black text-center text-2xl sm:text-3xl \
+                    let base = "w-12 h-12 sm:w-16 sm:h-16 \
+                        border-2 border-black text-center text-2xl sm:text-3xl \
                         font-bold uppercase outline-none cursor-pointer \
                         caret-transparent transition-colors focus:ring-4 \
-                        focus:ring-black/20";
+                        focus:ring-black/20 selection:bg-transparent";
                     let color = match grid.get()[row][col].color {
                         None => "bg-white text-black",
                         Some(GuessColor::Gray) => "bg-wordle-gray text-white",
-                        Some(GuessColor::Yellow) => "bg-wordle-yellow text-black",
+                        Some(GuessColor::Yellow) => "bg-wordle-yellow text-white",
                         Some(GuessColor::Green) => "bg-wordle-green text-white",
                     };
                     format!("{base} {color}")
@@ -231,6 +249,31 @@ pub fn App() -> impl IntoView {
                             (0..cols.get()).map(move |col| { get_tile_view(row, col) })
                         })
                         .collect_view()
+                }}
+            </div>
+
+            <div>
+                <button
+                    class="border-2 border-black p-2 px-6 \
+                        font-bold uppercase bg-white hover:bg-black hover:text-white \
+                        transition-colors h-[46px] ml-auto sm:ml-0 \
+                        disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
+                    on:click=move |_| solve()
+                    disabled=move || !is_solvable.get()
+                >
+                    Solve
+                </button>
+            </div>
+            <div class = "flex flex-wrap gap-2 max-w-2xl justify-center mt-4">
+                {move || {
+                    all_solutions.get().iter().take(display_count.get()).map(|word| {
+                        view! {
+                            <div class="bg-gray-200 px-3 py-1 rounded text-black font-semibold tracking-wider">
+                            {word.to_string()}
+                            </div>
+                        }
+                    })
+                    .collect_view()
                 }}
             </div>
         </main>
