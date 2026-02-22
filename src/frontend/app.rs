@@ -31,16 +31,26 @@ pub fn App() -> impl IntoView {
     let rows = RwSignal::new(3);
     let cols = RwSignal::new(5);
 
-    let grid = RwSignal::new(vec![vec![Tile::default(); cols.get_untracked()]; rows.get_untracked()]);
+    let grid = RwSignal::new(
+        (0..rows.get_untracked())
+            .map(|_| {
+                (0..cols.get_untracked())
+                    .map(|_| RwSignal::new(Tile::default()))
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<Vec<_>>>(),
+    );
 
     // register reactive grid resize
     Effect::new(move || {
         let new_rows = rows.get();
         let new_cols = cols.get();
         grid.update(|g| {
-            g.resize(new_rows, vec![Tile::default(); new_cols]);
+            g.resize_with(new_rows, || {
+                (0..new_cols).map(|_| RwSignal::new(Tile::default())).collect()
+            });
             for row in g.iter_mut() {
-                row.resize(new_cols, Tile::default());
+                row.resize_with(new_cols, || RwSignal::new(Tile::default()));
             }
         })
     });
@@ -51,7 +61,7 @@ pub fn App() -> impl IntoView {
         grid.get()
             .iter()
             .flatten()
-            .all(|tile| tile.char.is_some() && tile.color.is_some())
+            .all(|tile| tile.get().char.is_some() && tile.get().color.is_some())
     });
 
     let all_solutions = RwSignal::new(Vec::<&str>::new());
@@ -114,7 +124,7 @@ pub fn App() -> impl IntoView {
         let target: HtmlInputElement = event_target(&event);
         let val = target.value();
 
-        let current_char = grid.get_untracked()[row][col].char.map(|b| b as char);
+        let current_char = grid.get_untracked()[row][col].get_untracked().char.map(|b| b as char);
         let new_char = val
             .chars()
             .find(|&c| Some(c) != current_char)
@@ -122,15 +132,16 @@ pub fn App() -> impl IntoView {
 
         if let Some(char) = new_char {
             grid.update(|g| {
-                if g[row][col].char.is_none() {
-                    g[row][col].color = Some(GuessColor::Gray);
+                let signal = g[row][col];
+                if signal.get_untracked().char.is_none() {
+                    signal.update(|t| t.color = Some(GuessColor::Gray));
                 }
-                g[row][col].char = Some(char.to_ascii_uppercase() as u8)
+                signal.update(|t| t.char = Some(char.to_ascii_uppercase() as u8));
             });
             focus_after_moving(MoveDir::Right, row, col);
         } else {
             // Manually refresh DOM. Stops non-alphanumeric characters from being appended
-            let orig_char = match grid.get_untracked()[row][col].char {
+            let orig_char = match grid.get_untracked()[row][col].get_untracked().char {
                 None => String::new(),
                 Some(byte) => (byte as char).to_string(),
             };
@@ -140,10 +151,10 @@ pub fn App() -> impl IntoView {
 
     let handle_keydown = move |event: web_sys::KeyboardEvent, row: usize, col: usize| match event.key().as_str() {
         " " => {
-            grid.update(|g| g[row][col].char = None);
+            grid.update(|g| g[row][col].update(|t| t.char = None));
         }
         "Backspace" => {
-            grid.update(|g| g[row][col].char = None);
+            grid.update(|g| g[row][col].update(|t| t.char = None));
             focus_after_moving(MoveDir::Left, row, col);
         }
         "ArrowLeft" => {
@@ -162,22 +173,24 @@ pub fn App() -> impl IntoView {
     };
 
     let cycle_status = move |row: usize, col: usize| {
-        grid.update(|g| {
-            g[row][col].color = match g[row][col].color {
+        let t_sig = grid.get_untracked()[row][col];
+
+        t_sig.update(|t| {
+            t.color = match t.color {
                 None => Some(GuessColor::Gray),
                 Some(GuessColor::Gray) => Some(GuessColor::Yellow),
                 Some(GuessColor::Green) => Some(GuessColor::Gray),
                 Some(GuessColor::Yellow) => Some(GuessColor::Green),
-            };
+            }
         });
     };
 
-    let get_tile_view = move |row: usize, col: usize| {
+    let get_tile_view = move |row: usize, col: usize, t_sig: RwSignal<Tile>| {
         view! {
             <input
                 id=format!("tile-{row}-{col}")
                 type="text"
-                prop:value=move || match grid.get()[row][col].char {
+                prop:value=move || match t_sig.get().char {
                     None => String::new(),
                     Some(byte) => (byte as char).to_string(),
                 }
@@ -187,7 +200,7 @@ pub fn App() -> impl IntoView {
                         font-bold uppercase outline-none cursor-pointer \
                         caret-transparent transition-colors focus:ring-4 \
                         focus:ring-black/20 selection:bg-transparent";
-                    let color = match grid.get()[row][col].color {
+                    let color = match t_sig.get().color {
                         None => "bg-white text-black",
                         Some(GuessColor::Gray) => "bg-wordle-gray text-white",
                         Some(GuessColor::Yellow) => "bg-wordle-yellow text-white",
@@ -252,13 +265,17 @@ pub fn App() -> impl IntoView {
             <div
                 class="grid gap-2"
                 style:grid-template-columns=move || {
-                    format!("repeat({}, minmax(0, 1fr)", cols.get())
+                    format!("repeat({}, minmax(0, 1fr))", cols.get())
                 }
             >
                 {move || {
-                    (0..rows.get())
-                        .flat_map(|row| {
-                            (0..cols.get()).map(move |col| { get_tile_view(row, col) })
+                    grid.get()
+                        .into_iter()
+                        .enumerate()
+                        .flat_map(|(y, row)| {
+                            row.into_iter()
+                                .enumerate()
+                                .map(move |(x, t_sig)| { get_tile_view(y, x, t_sig) })
                         })
                         .collect_view()
                 }}

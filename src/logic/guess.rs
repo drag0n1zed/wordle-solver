@@ -1,3 +1,4 @@
+use leptos::prelude::{Get, GetUntracked, RwSignal};
 use serde::{Deserialize, Serialize};
 
 use crate::frontend::app::Tile;
@@ -24,11 +25,12 @@ pub struct Guesses {
 
 impl Guesses {
     // None if grid contains tile with no color or no character
-    pub fn from_grid(grid: Vec<Vec<Tile>>, word_len: usize) -> Option<Self> {
+    pub fn from_grid(grid: Vec<Vec<RwSignal<Tile>>>, word_len: usize) -> Option<Self> {
         let val: Vec<LetterGuess> = grid
             .iter()
             .flatten()
-            .map(|tile| {
+            .map(|signal| {
+                let tile = signal.get_untracked();
                 Some(LetterGuess {
                     color: tile.color?,
                     char: tile.char?,
