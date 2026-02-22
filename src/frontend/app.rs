@@ -114,9 +114,13 @@ pub fn App() -> impl IntoView {
         let target: HtmlInputElement = event_target(&event);
         let val = target.value();
 
-        if let Some(char) = val.chars().last()
-            && char.is_ascii_alphabetic()
-        {
+        let current_char = grid.get_untracked()[row][col].char.map(|b| b as char);
+        let new_char = val
+            .chars()
+            .find(|&c| Some(c) != current_char)
+            .filter(|c| c.is_ascii_alphabetic());
+
+        if let Some(char) = new_char {
             grid.update(|g| {
                 if g[row][col].char.is_none() {
                     g[row][col].color = Some(GuessColor::Gray);
@@ -190,6 +194,9 @@ pub fn App() -> impl IntoView {
                         Some(GuessColor::Green) => "bg-wordle-green text-white",
                     };
                     format!("{base} {color}")
+                }
+                on:focus=move |e| {
+                    let _ = event_target::<HtmlInputElement>(&e).select();
                 }
                 on:input=move |e| handle_input(e, row, col)
                 on:keydown=move |e| handle_keydown(e, row, col)
