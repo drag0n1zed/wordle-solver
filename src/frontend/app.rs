@@ -117,7 +117,12 @@ pub fn App() -> impl IntoView {
         if let Some(char) = val.chars().last()
             && char.is_ascii_alphabetic()
         {
-            grid.update(|g| g[row][col].char = Some(char.to_ascii_uppercase() as u8));
+            grid.update(|g| {
+                if g[row][col].char.is_none() {
+                    g[row][col].color = Some(GuessColor::Gray);
+                }
+                g[row][col].char = Some(char.to_ascii_uppercase() as u8)
+            });
             focus_after_moving(MoveDir::Right, row, col);
         } else {
             // Manually refresh DOM. Stops non-alphanumeric characters from being appended
@@ -255,25 +260,29 @@ pub fn App() -> impl IntoView {
             <div>
                 <button
                     class="border-2 border-black p-2 px-6 \
-                        font-bold uppercase bg-white hover:bg-black hover:text-white \
-                        transition-colors h-[46px] ml-auto sm:ml-0 \
-                        disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
+                    font-bold uppercase bg-white hover:bg-black hover:text-white \
+                    transition-colors h-[46px] ml-auto sm:ml-0 \
+                    disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
                     on:click=move |_| solve()
                     disabled=move || !is_solvable.get()
                 >
                     Solve
                 </button>
             </div>
-            <div class = "flex flex-wrap gap-2 max-w-2xl justify-center mt-4">
+            <div class="flex flex-wrap gap-2 max-w-2xl justify-center mt-4">
                 {move || {
-                    all_solutions.get().iter().take(display_count.get()).map(|word| {
-                        view! {
-                            <div class="bg-gray-200 px-3 py-1 rounded text-black font-semibold tracking-wider">
-                            {word.to_string()}
-                            </div>
-                        }
-                    })
-                    .collect_view()
+                    all_solutions
+                        .get()
+                        .iter()
+                        .take(display_count.get())
+                        .map(|word| {
+                            view! {
+                                <div class="bg-gray-200 px-3 py-1 rounded text-black font-semibold tracking-wider">
+                                    {word.to_string()}
+                                </div>
+                            }
+                        })
+                        .collect_view()
                 }}
             </div>
         </main>
