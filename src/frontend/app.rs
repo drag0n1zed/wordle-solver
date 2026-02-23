@@ -26,49 +26,54 @@ pub struct Tile {
     pub char: Option<u8>,
 }
 
+#[derive(Clone)]
+pub struct Grid {
+    pub rows: usize,
+    pub cols: usize,
+    pub tiles: Vec<Vec<RwSignal<Tile>>>,
+}
+
+impl Grid {
+    fn new(rows: usize, cols: usize) -> Self {
+        let tiles = (0..rows)
+            .map(|_| (0..cols).map(|_| RwSignal::new(Tile::default())).collect())
+            .collect();
+        Self { rows, cols, tiles }
+    }
+}
+
 #[component]
 pub fn App() -> impl IntoView {
-    let rows = RwSignal::new(3);
-    let cols = RwSignal::new(5);
+    let grid = RwSignal::new(Grid::new(3, 5));
 
-    let grid = RwSignal::new(
-        (0..rows.get_untracked())
-            .map(|_| {
-                (0..cols.get_untracked())
-                    .map(|_| RwSignal::new(Tile::default()))
-                    .collect::<Vec<_>>()
-            })
-            .collect::<Vec<Vec<_>>>(),
-    );
-
-    // register reactive grid resize
-    Effect::new(move || {
-        let new_rows = rows.get();
-        let new_cols = cols.get();
+    let resize_grid = move |new_rows: Option<usize>, new_cols: Option<usize>| {
         grid.update(|g| {
-            g.resize_with(new_rows, || {
-                (0..new_cols).map(|_| RwSignal::new(Tile::default())).collect()
-            });
-            for row in g.iter_mut() {
-                row.resize_with(new_cols, || RwSignal::new(Tile::default()));
+            new_rows.map(|r| g.rows = r);
+            new_cols.map(|c| g.cols = c);
+            g.tiles
+                .resize_with(g.rows, || (0..g.cols).map(|_| RwSignal::new(Tile::default())).collect());
+            for row in g.tiles.iter_mut() {
+                row.resize_with(g.cols, || RwSignal::new(Tile::default()));
             }
-        })
-    });
+        });
+    };
 
     let wordlist = get_str_asset("data/enable1.txt").expect("wordlist load failed");
 
     let is_solvable = Memo::new(move |_| {
-        grid.get()
-            .iter()
-            .flatten()
-            .all(|tile| tile.get().char.is_some() && tile.get().color.is_some())
+        grid.with(|g| {
+            g.tiles
+                .iter()
+                .flatten()
+                .all(|tile| tile.with(|t| t.char.is_some() && t.color.is_some()))
+        })
     });
 
     let all_solutions = RwSignal::new(Vec::<&str>::new());
     let display_count = RwSignal::new(20);
 
     let solve = move || {
-        let guesses = Guesses::from_grid(grid.get(), cols.get()).expect("tiles should be filled but aren't");
+        let guesses = grid.with(|g| Guesses::from_grid(g).expect("tiles should be filled but aren't"));
         let reqs: Requirement = guesses.into();
         let results: Vec<&str> = reqs.filter_wordlist(wordlist).collect();
         all_solutions.set(results);
@@ -91,7 +96,10 @@ pub fn App() -> impl IntoView {
     };
 
     let focus_after_moving = move |dir: MoveDir, row: usize, col: usize| {
-        let (total_rows, total_cols) = (rows.get_untracked(), cols.get_untracked());
+        let (total_rows, total_cols) = {
+            let g = grid.read();
+            (g.rows, g.cols)
+        };
         match dir {
             MoveDir::Left => {
                 if col > 0 {
@@ -123,9 +131,9 @@ pub fn App() -> impl IntoView {
     let handle_input = move |event: web_sys::Event, row: usize, col: usize| {
         let target: HtmlInputElement = event_target(&event);
         let val = target.value();
-        let t_sig = grid.get_untracked()[row][col];
+        let t_sig = grid.read_untracked().tiles[row][col];
 
-        let current_char = t_sig.get_untracked().char.map(|b| b as char);
+        let current_char = t_sig.read_untracked().char.map(|b| b as char);
         let new_char = val
             .chars()
             .find(|&c| Some(c) != current_char)
@@ -142,7 +150,7 @@ pub fn App() -> impl IntoView {
             focus_after_moving(MoveDir::Right, row, col);
         } else {
             // Manually refresh DOM. Stops non-alphanumeric characters from being appended
-            let orig_char = match t_sig.get_untracked().char {
+            let orig_char = match t_sig.read_untracked().char {
                 None => String::new(),
                 Some(byte) => (byte as char).to_string(),
             };
@@ -151,7 +159,7 @@ pub fn App() -> impl IntoView {
     };
 
     let handle_keydown = move |event: web_sys::KeyboardEvent, row: usize, col: usize| {
-        let t_sig = grid.get_untracked()[row][col];
+        let t_sig = grid.read_untracked().tiles[row][col];
         match event.key().as_str() {
             " " => {
                 t_sig.update(|t| t.char = None);
@@ -177,7 +185,7 @@ pub fn App() -> impl IntoView {
     };
 
     let cycle_status = move |row: usize, col: usize| {
-        let t_sig = grid.get_untracked()[row][col];
+        let t_sig = grid.read_untracked().tiles[row][col];
 
         t_sig.update(|t| {
             t.color = match t.color {
@@ -189,7 +197,8 @@ pub fn App() -> impl IntoView {
         });
     };
 
-    let get_tile_view = move |row: usize, col: usize, t_sig: RwSignal<Tile>| {
+    let get_tile_view = move |row: usize, col: usize| {
+        let t_sig = grid.read_untracked().tiles[row][col];
         view! {
             <input
                 id=format!("tile-{row}-{col}")
@@ -232,13 +241,13 @@ pub fn App() -> impl IntoView {
                     <input
                         type="number"
                         id="guess-count"
-                        prop:value=move || rows.get()
+                        prop:value=move || grid.read().rows
                         min="1"
                         max="100"
                         on:change=move |e| {
                             if let Ok(val) = event_target_value(&e).parse::<usize>() {
                                 if (1..=100).contains(&val) {
-                                    rows.set(val);
+                                    resize_grid(Some(val), None);
                                 }
                             }
                         }
@@ -251,14 +260,14 @@ pub fn App() -> impl IntoView {
                     <input
                         type="number"
                         id="word-length"
-                        prop:value=move || cols.get()
+                        prop:value=move || grid.read().cols
                         min="2"
                         // ethylenediaminetetraacetates
                         max="28"
                         on:change=move |e| {
                             if let Ok(val) = event_target_value(&e).parse::<usize>() {
                                 if (2..=28).contains(&val) {
-                                    cols.set(val);
+                                    resize_grid(None, Some(val));
                                 }
                             }
                         }
@@ -269,17 +278,15 @@ pub fn App() -> impl IntoView {
             <div
                 class="grid gap-2"
                 style:grid-template-columns=move || {
-                    format!("repeat({}, minmax(0, 1fr))", cols.get())
+                    format!("repeat({}, minmax(0, 1fr))", grid.read().cols)
                 }
             >
                 {move || {
-                    grid.get()
-                        .into_iter()
-                        .enumerate()
-                        .flat_map(|(y, row)| {
-                            row.into_iter()
-                                .enumerate()
-                                .map(move |(x, t_sig)| { get_tile_view(y, x, t_sig) })
+                    let g = grid.read();
+                    let (rows, cols) = (g.rows, g.cols);
+                    (0..rows)
+                        .map(|row| {
+                            (0..cols).map(|col| { get_tile_view(row, col) }).collect_view()
                         })
                         .collect_view()
                 }}
