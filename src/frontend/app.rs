@@ -26,205 +26,6 @@ pub struct Tile {
     pub char: Option<u8>,
 }
 
-enum MoveDir {
-    Left,
-    Right,
-    Down,
-    Up,
-}
-
-fn update_grid_size(grid: RwSignal<Vec<Vec<RwSignal<Tile>>>>, new_rows: usize, new_cols: usize) {
-    grid.update(|g| {
-        g.resize_with(new_rows, || {
-            (0..new_cols).map(|_| RwSignal::new(Tile::default())).collect()
-        });
-        for row in g.iter_mut() {
-            row.resize_with(new_cols, || RwSignal::new(Tile::default()));
-        }
-    });
-}
-
-fn is_grid_solvable(grid: RwSignal<Vec<Vec<RwSignal<Tile>>>>) -> bool {
-    grid.get()
-        .iter()
-        .flatten()
-        .all(|tile| tile.get().char.is_some() && tile.get().color.is_some())
-}
-
-fn solve_action(
-    grid: RwSignal<Vec<Vec<RwSignal<Tile>>>>,
-    cols: RwSignal<usize>,
-    wordlist: &'static str,
-    all_solutions: RwSignal<Vec<&'static str>>,
-    display_count: RwSignal<usize>,
-) {
-    let guesses = Guesses::from_grid(grid.get(), cols.get()).expect("tiles should be filled but aren't");
-    let reqs: Requirement = guesses.into();
-    let results: Vec<&str> = reqs.filter_wordlist(wordlist).collect();
-    all_solutions.set(results);
-    display_count.set(20);
-}
-
-fn focus_by_grid_coords(row: usize, col: usize) {
-    if let Some(elem) = document().get_element_by_id(format!("tile-{row}-{col}").as_str()) {
-        if let Ok(input) = elem.dyn_into::<HtmlInputElement>() {
-            let _ = input.focus();
-        }
-    }
-}
-
-fn focus_after_moving(dir: MoveDir, row: usize, col: usize, rows: RwSignal<usize>, cols: RwSignal<usize>) {
-    let (total_rows, total_cols) = (rows.get_untracked(), cols.get_untracked());
-    match dir {
-        MoveDir::Left => {
-            if col > 0 {
-                focus_by_grid_coords(row, col - 1);
-            } else if row > 0 {
-                focus_by_grid_coords(row - 1, total_cols - 1);
-            }
-        }
-        MoveDir::Right => {
-            if col + 1 < total_cols {
-                focus_by_grid_coords(row, col + 1);
-            } else if row + 1 < total_rows {
-                focus_by_grid_coords(row + 1, 0);
-            }
-        }
-        MoveDir::Up => {
-            if row > 0 {
-                focus_by_grid_coords(row - 1, col);
-            }
-        }
-        MoveDir::Down => {
-            if row + 1 < total_rows {
-                focus_by_grid_coords(row + 1, col);
-            }
-        }
-    }
-}
-
-fn handle_input(
-    event: web_sys::Event,
-    row: usize,
-    col: usize,
-    grid: RwSignal<Vec<Vec<RwSignal<Tile>>>>,
-    rows: RwSignal<usize>,
-    cols: RwSignal<usize>,
-) {
-    let target: HtmlInputElement = event_target(&event);
-    let val = target.value();
-
-    let current_char = grid.get_untracked()[row][col].get_untracked().char.map(|b| b as char);
-    let new_char = val
-        .chars()
-        .find(|&c| Some(c) != current_char)
-        .filter(|c| c.is_ascii_alphabetic());
-
-    if let Some(char) = new_char {
-        grid.update(|g| {
-            let signal = g[row][col];
-            if signal.get_untracked().char.is_none() {
-                signal.update(|t| t.color = Some(GuessColor::Gray));
-            }
-            signal.update(|t| t.char = Some(char.to_ascii_uppercase() as u8));
-        });
-        focus_after_moving(MoveDir::Right, row, col, rows, cols);
-    } else {
-        // Manually refresh DOM. Stops non-alphanumeric characters from being appended
-        let orig_char = match grid.get_untracked()[row][col].get_untracked().char {
-            None => String::new(),
-            Some(byte) => (byte as char).to_string(),
-        };
-        target.set_value(&orig_char);
-    }
-}
-
-fn handle_keydown(
-    event: web_sys::KeyboardEvent,
-    row: usize,
-    col: usize,
-    grid: RwSignal<Vec<Vec<RwSignal<Tile>>>>,
-    rows: RwSignal<usize>,
-    cols: RwSignal<usize>,
-) {
-    match event.key().as_str() {
-        " " => {
-            grid.update(|g| g[row][col].update(|t| t.char = None));
-        }
-        "Backspace" => {
-            grid.update(|g| g[row][col].update(|t| t.char = None));
-            focus_after_moving(MoveDir::Left, row, col, rows, cols);
-        }
-        "ArrowLeft" => {
-            focus_after_moving(MoveDir::Left, row, col, rows, cols);
-        }
-        "ArrowRight" => {
-            focus_after_moving(MoveDir::Right, row, col, rows, cols);
-        }
-        "ArrowUp" => {
-            focus_after_moving(MoveDir::Up, row, col, rows, cols);
-        }
-        "ArrowDown" => {
-            focus_after_moving(MoveDir::Down, row, col, rows, cols);
-        }
-        _ => {}
-    }
-}
-
-fn cycle_status(row: usize, col: usize, grid: RwSignal<Vec<Vec<RwSignal<Tile>>>>) {
-    let t_sig = grid.get_untracked()[row][col];
-
-    t_sig.update(|t| {
-        t.color = match t.color {
-            None => Some(GuessColor::Gray),
-            Some(GuessColor::Gray) => Some(GuessColor::Yellow),
-            Some(GuessColor::Green) => Some(GuessColor::Gray),
-            Some(GuessColor::Yellow) => Some(GuessColor::Green),
-        }
-    });
-}
-
-fn get_tile_view(
-    row: usize,
-    col: usize,
-    grid: RwSignal<Vec<Vec<RwSignal<Tile>>>>,
-    rows: RwSignal<usize>,
-    cols: RwSignal<usize>,
-) -> impl IntoView {
-    let t_sig = grid.get_untracked()[row][col];
-    view! {
-        <input
-            id=format!("tile-{row}-{col}")
-            type="text"
-            prop:value=move || match t_sig.get().char {
-                None => String::new(),
-                Some(byte) => (byte as char).to_string(),
-            }
-            class=move || {
-                let base = "w-12 h-12 sm:w-16 sm:h-16 \
-                    border-2 border-black text-center text-2xl sm:text-3xl \
-                    font-bold uppercase outline-none cursor-pointer \
-                    caret-transparent transition-colors focus:ring-4 \
-                    focus:ring-black/20 selection:bg-transparent";
-                let color = match t_sig.get().color {
-                    None => "bg-white text-black",
-                    Some(GuessColor::Gray) => "bg-wordle-gray text-white",
-                    Some(GuessColor::Yellow) => "bg-wordle-yellow text-white",
-                    Some(GuessColor::Green) => "bg-wordle-green text-white",
-                };
-                format!("{base} {color}")
-            }
-            on:focus=move |e| {
-                let _ = event_target::<HtmlInputElement>(&e).select();
-            }
-            on:input=move |e| handle_input(e, row, col, grid, rows, cols)
-            on:keydown=move |e| handle_keydown(e, row, col, grid, rows, cols)
-            on:click=move |_| cycle_status(row, col, grid)
-            autocomplete="off"
-        />
-    }
-}
-
 #[component]
 pub fn App() -> impl IntoView {
     let rows = RwSignal::new(3);
@@ -242,18 +43,180 @@ pub fn App() -> impl IntoView {
 
     // register reactive grid resize
     Effect::new(move || {
-        update_grid_size(grid, rows.get(), cols.get());
+        let new_rows = rows.get();
+        let new_cols = cols.get();
+        grid.update(|g| {
+            g.resize_with(new_rows, || {
+                (0..new_cols).map(|_| RwSignal::new(Tile::default())).collect()
+            });
+            for row in g.iter_mut() {
+                row.resize_with(new_cols, || RwSignal::new(Tile::default()));
+            }
+        })
     });
 
     let wordlist = get_str_asset("data/enable1.txt").expect("wordlist load failed");
 
-    let is_solvable = Memo::new(move |_| is_grid_solvable(grid));
+    let is_solvable = Memo::new(move |_| {
+        grid.get()
+            .iter()
+            .flatten()
+            .all(|tile| tile.get().char.is_some() && tile.get().color.is_some())
+    });
 
     let all_solutions = RwSignal::new(Vec::<&str>::new());
     let display_count = RwSignal::new(20);
 
     let solve = move || {
-        solve_action(grid, cols, wordlist, all_solutions, display_count);
+        let guesses = Guesses::from_grid(grid.get(), cols.get()).expect("tiles should be filled but aren't");
+        let reqs: Requirement = guesses.into();
+        let results: Vec<&str> = reqs.filter_wordlist(wordlist).collect();
+        all_solutions.set(results);
+        display_count.set(20);
+    };
+
+    enum MoveDir {
+        Left,
+        Right,
+        Down,
+        Up,
+    }
+
+    let focus_by_grid_coords = move |row: usize, col: usize| {
+        if let Some(elem) = document().get_element_by_id(format!("tile-{row}-{col}").as_str()) {
+            if let Ok(input) = elem.dyn_into::<HtmlInputElement>() {
+                let _ = input.focus();
+            }
+        }
+    };
+
+    let focus_after_moving = move |dir: MoveDir, row: usize, col: usize| {
+        let (total_rows, total_cols) = (rows.get_untracked(), cols.get_untracked());
+        match dir {
+            MoveDir::Left => {
+                if col > 0 {
+                    focus_by_grid_coords(row, col - 1);
+                } else if row > 0 {
+                    focus_by_grid_coords(row - 1, total_cols - 1);
+                }
+            }
+            MoveDir::Right => {
+                if col + 1 < total_cols {
+                    focus_by_grid_coords(row, col + 1);
+                } else if row + 1 < total_rows {
+                    focus_by_grid_coords(row + 1, 0);
+                }
+            }
+            MoveDir::Up => {
+                if row > 0 {
+                    focus_by_grid_coords(row - 1, col);
+                }
+            }
+            MoveDir::Down => {
+                if row + 1 < total_rows {
+                    focus_by_grid_coords(row + 1, col);
+                }
+            }
+        }
+    };
+
+    let handle_input = move |event: web_sys::Event, row: usize, col: usize| {
+        let target: HtmlInputElement = event_target(&event);
+        let val = target.value();
+
+        let current_char = grid.get_untracked()[row][col].get_untracked().char.map(|b| b as char);
+        let new_char = val
+            .chars()
+            .find(|&c| Some(c) != current_char)
+            .filter(|c| c.is_ascii_alphabetic());
+
+        if let Some(char) = new_char {
+            grid.update(|g| {
+                let signal = g[row][col];
+                if signal.get_untracked().char.is_none() {
+                    signal.update(|t| t.color = Some(GuessColor::Gray));
+                }
+                signal.update(|t| t.char = Some(char.to_ascii_uppercase() as u8));
+            });
+            focus_after_moving(MoveDir::Right, row, col);
+        } else {
+            // Manually refresh DOM. Stops non-alphanumeric characters from being appended
+            let orig_char = match grid.get_untracked()[row][col].get_untracked().char {
+                None => String::new(),
+                Some(byte) => (byte as char).to_string(),
+            };
+            target.set_value(&orig_char);
+        }
+    };
+
+    let handle_keydown = move |event: web_sys::KeyboardEvent, row: usize, col: usize| match event.key().as_str() {
+        " " => {
+            grid.update(|g| g[row][col].update(|t| t.char = None));
+        }
+        "Backspace" => {
+            grid.update(|g| g[row][col].update(|t| t.char = None));
+            focus_after_moving(MoveDir::Left, row, col);
+        }
+        "ArrowLeft" => {
+            focus_after_moving(MoveDir::Left, row, col);
+        }
+        "ArrowRight" => {
+            focus_after_moving(MoveDir::Right, row, col);
+        }
+        "ArrowUp" => {
+            focus_after_moving(MoveDir::Up, row, col);
+        }
+        "ArrowDown" => {
+            focus_after_moving(MoveDir::Down, row, col);
+        }
+        _ => {}
+    };
+
+    let cycle_status = move |row: usize, col: usize| {
+        let t_sig = grid.get_untracked()[row][col];
+
+        t_sig.update(|t| {
+            t.color = match t.color {
+                None => Some(GuessColor::Gray),
+                Some(GuessColor::Gray) => Some(GuessColor::Yellow),
+                Some(GuessColor::Green) => Some(GuessColor::Gray),
+                Some(GuessColor::Yellow) => Some(GuessColor::Green),
+            }
+        });
+    };
+
+    let get_tile_view = move |row: usize, col: usize, t_sig: RwSignal<Tile>| {
+        view! {
+            <input
+                id=format!("tile-{row}-{col}")
+                type="text"
+                prop:value=move || match t_sig.get().char {
+                    None => String::new(),
+                    Some(byte) => (byte as char).to_string(),
+                }
+                class=move || {
+                    let base = "w-12 h-12 sm:w-16 sm:h-16 \
+                        border-2 border-black text-center text-2xl sm:text-3xl \
+                        font-bold uppercase outline-none cursor-pointer \
+                        caret-transparent transition-colors focus:ring-4 \
+                        focus:ring-black/20 selection:bg-transparent";
+                    let color = match t_sig.get().color {
+                        None => "bg-white text-black",
+                        Some(GuessColor::Gray) => "bg-wordle-gray text-white",
+                        Some(GuessColor::Yellow) => "bg-wordle-yellow text-white",
+                        Some(GuessColor::Green) => "bg-wordle-green text-white",
+                    };
+                    format!("{base} {color}")
+                }
+                on:focus=move |e| {
+                    let _ = event_target::<HtmlInputElement>(&e).select();
+                }
+                on:input=move |e| handle_input(e, row, col)
+                on:keydown=move |e| handle_keydown(e, row, col)
+                on:click=move |_| cycle_status(row, col)
+                autocomplete="off"
+            />
+        }
     };
 
     view! {
@@ -306,9 +269,13 @@ pub fn App() -> impl IntoView {
                 }
             >
                 {move || {
-                    (0..rows.get())
-                        .flat_map(|y| {
-                            (0..cols.get()).map(move |x| { get_tile_view(y, x, grid, rows, cols) })
+                    grid.get()
+                        .into_iter()
+                        .enumerate()
+                        .flat_map(|(y, row)| {
+                            row.into_iter()
+                                .enumerate()
+                                .map(move |(x, t_sig)| { get_tile_view(y, x, t_sig) })
                         })
                         .collect_view()
                 }}
