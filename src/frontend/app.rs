@@ -123,25 +123,26 @@ pub fn App() -> impl IntoView {
     let handle_input = move |event: web_sys::Event, row: usize, col: usize| {
         let target: HtmlInputElement = event_target(&event);
         let val = target.value();
+        let t_sig = grid.get_untracked()[row][col];
 
-        let current_char = grid.get_untracked()[row][col].get_untracked().char.map(|b| b as char);
+        let current_char = t_sig.get_untracked().char.map(|b| b as char);
         let new_char = val
             .chars()
             .find(|&c| Some(c) != current_char)
             .filter(|c| c.is_ascii_alphabetic());
 
         if let Some(char) = new_char {
-            grid.update(|g| {
-                let signal = g[row][col];
-                if signal.get_untracked().char.is_none() {
-                    signal.update(|t| t.color = Some(GuessColor::Gray));
+            t_sig.update(|t| {
+                if t.char.is_none() {
+                    t.color = Some(GuessColor::Gray);
                 }
-                signal.update(|t| t.char = Some(char.to_ascii_uppercase() as u8));
+                t.char = Some(char.to_ascii_uppercase() as u8);
             });
+
             focus_after_moving(MoveDir::Right, row, col);
         } else {
             // Manually refresh DOM. Stops non-alphanumeric characters from being appended
-            let orig_char = match grid.get_untracked()[row][col].get_untracked().char {
+            let orig_char = match t_sig.get_untracked().char {
                 None => String::new(),
                 Some(byte) => (byte as char).to_string(),
             };
@@ -149,27 +150,30 @@ pub fn App() -> impl IntoView {
         }
     };
 
-    let handle_keydown = move |event: web_sys::KeyboardEvent, row: usize, col: usize| match event.key().as_str() {
-        " " => {
-            grid.update(|g| g[row][col].update(|t| t.char = None));
+    let handle_keydown = move |event: web_sys::KeyboardEvent, row: usize, col: usize| {
+        let t_sig = grid.get_untracked()[row][col];
+        match event.key().as_str() {
+            " " => {
+                t_sig.update(|t| t.char = None);
+            }
+            "Backspace" => {
+                t_sig.update(|t| t.char = None);
+                focus_after_moving(MoveDir::Left, row, col);
+            }
+            "ArrowLeft" => {
+                focus_after_moving(MoveDir::Left, row, col);
+            }
+            "ArrowRight" => {
+                focus_after_moving(MoveDir::Right, row, col);
+            }
+            "ArrowUp" => {
+                focus_after_moving(MoveDir::Up, row, col);
+            }
+            "ArrowDown" => {
+                focus_after_moving(MoveDir::Down, row, col);
+            }
+            _ => {}
         }
-        "Backspace" => {
-            grid.update(|g| g[row][col].update(|t| t.char = None));
-            focus_after_moving(MoveDir::Left, row, col);
-        }
-        "ArrowLeft" => {
-            focus_after_moving(MoveDir::Left, row, col);
-        }
-        "ArrowRight" => {
-            focus_after_moving(MoveDir::Right, row, col);
-        }
-        "ArrowUp" => {
-            focus_after_moving(MoveDir::Up, row, col);
-        }
-        "ArrowDown" => {
-            focus_after_moving(MoveDir::Down, row, col);
-        }
-        _ => {}
     };
 
     let cycle_status = move |row: usize, col: usize| {
