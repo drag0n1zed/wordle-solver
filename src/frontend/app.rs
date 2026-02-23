@@ -20,7 +20,7 @@ where
     std::str::from_utf8(bytes).ok()
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, PartialEq, Clone, Copy)]
 pub struct Tile {
     pub color: Option<GuessColor>,
     pub char: Option<u8>,
@@ -30,14 +30,12 @@ pub struct Tile {
 pub struct Grid {
     pub rows: usize,
     pub cols: usize,
-    pub tiles: Vec<Vec<RwSignal<Tile>>>,
+    pub tiles: Vec<Vec<Tile>>,
 }
 
 impl Grid {
     fn new(rows: usize, cols: usize) -> Self {
-        let tiles = (0..rows)
-            .map(|_| (0..cols).map(|_| RwSignal::new(Tile::default())).collect())
-            .collect();
+        let tiles = vec![vec![Tile::default(); cols]; rows];
         Self { rows, cols, tiles }
     }
 }
@@ -50,10 +48,9 @@ pub fn App() -> impl IntoView {
         grid.update(|g| {
             new_rows.map(|r| g.rows = r);
             new_cols.map(|c| g.cols = c);
-            g.tiles
-                .resize_with(g.rows, || (0..g.cols).map(|_| RwSignal::new(Tile::default())).collect());
+            g.tiles.resize(g.rows, vec![Tile::default(); g.cols]);
             for row in g.tiles.iter_mut() {
-                row.resize_with(g.cols, || RwSignal::new(Tile::default()));
+                row.resize(g.cols, Tile::default());
             }
         });
     };
@@ -65,7 +62,7 @@ pub fn App() -> impl IntoView {
             g.tiles
                 .iter()
                 .flatten()
-                .all(|tile| tile.with(|t| t.char.is_some() && t.color.is_some()))
+                .all(|tile| tile.char.is_some() && tile.color.is_some())
         })
     });
 
@@ -73,7 +70,7 @@ pub fn App() -> impl IntoView {
     let display_count = RwSignal::new(20);
 
     let solve = move || {
-        let guesses = grid.with(|g| Guesses::from_grid(g).expect("tiles should be filled but aren't"));
+        let guesses = grid.with(|g| Guesses::try_from(g).expect("tiles should be filled but aren't"));
         let reqs: Requirement = guesses.into();
         let results: Vec<&str> = reqs.filter_wordlist(wordlist).collect();
         all_solutions.set(results);
@@ -131,26 +128,25 @@ pub fn App() -> impl IntoView {
     let handle_input = move |event: web_sys::Event, row: usize, col: usize| {
         let target: HtmlInputElement = event_target(&event);
         let val = target.value();
-        let t_sig = grid.read_untracked().tiles[row][col];
 
-        let current_char = t_sig.read_untracked().char.map(|b| b as char);
+        let current_char = grid.with_untracked(|g| g.tiles[row][col].char.map(|b| b as char));
         let new_char = val
             .chars()
             .find(|&c| Some(c) != current_char)
             .filter(|c| c.is_ascii_alphabetic());
 
         if let Some(char) = new_char {
-            t_sig.update(|t| {
+            grid.update(|g| {
+                let t = &mut g.tiles[row][col];
                 if t.char.is_none() {
                     t.color = Some(GuessColor::Gray);
                 }
                 t.char = Some(char.to_ascii_uppercase() as u8);
             });
-
             focus_after_moving(MoveDir::Right, row, col);
         } else {
             // Manually refresh DOM. Stops non-alphanumeric characters from being appended
-            let orig_char = match t_sig.read_untracked().char {
+            let orig_char = match current_char {
                 None => String::new(),
                 Some(byte) => (byte as char).to_string(),
             };
@@ -159,51 +155,54 @@ pub fn App() -> impl IntoView {
     };
 
     let handle_keydown = move |event: web_sys::KeyboardEvent, row: usize, col: usize| {
-        let t_sig = grid.read_untracked().tiles[row][col];
-        match event.key().as_str() {
-            " " => {
-                t_sig.update(|t| t.char = None);
+        grid.update(|g| {
+            let t = &mut g.tiles[row][col];
+            match event.key().as_str() {
+                " " => {
+                    t.char = None;
+                }
+                "Backspace" => {
+                    t.char = None;
+                    focus_after_moving(MoveDir::Left, row, col);
+                }
+                "ArrowLeft" => {
+                    focus_after_moving(MoveDir::Left, row, col);
+                }
+                "ArrowRight" => {
+                    focus_after_moving(MoveDir::Right, row, col);
+                }
+                "ArrowUp" => {
+                    focus_after_moving(MoveDir::Up, row, col);
+                }
+                "ArrowDown" => {
+                    focus_after_moving(MoveDir::Down, row, col);
+                }
+                _ => {}
             }
-            "Backspace" => {
-                t_sig.update(|t| t.char = None);
-                focus_after_moving(MoveDir::Left, row, col);
-            }
-            "ArrowLeft" => {
-                focus_after_moving(MoveDir::Left, row, col);
-            }
-            "ArrowRight" => {
-                focus_after_moving(MoveDir::Right, row, col);
-            }
-            "ArrowUp" => {
-                focus_after_moving(MoveDir::Up, row, col);
-            }
-            "ArrowDown" => {
-                focus_after_moving(MoveDir::Down, row, col);
-            }
-            _ => {}
-        }
+        });
     };
 
     let cycle_status = move |row: usize, col: usize| {
-        let t_sig = grid.read_untracked().tiles[row][col];
+        grid.update(|g| {
+            let t = &mut g.tiles[row][col];
 
-        t_sig.update(|t| {
             t.color = match t.color {
                 None => Some(GuessColor::Gray),
                 Some(GuessColor::Gray) => Some(GuessColor::Yellow),
                 Some(GuessColor::Green) => Some(GuessColor::Gray),
                 Some(GuessColor::Yellow) => Some(GuessColor::Green),
-            }
+            };
         });
     };
 
     let get_tile_view = move |row: usize, col: usize| {
-        let t_sig = grid.read_untracked().tiles[row][col];
+        let t = Memo::new(move |_| grid.read().tiles[row][col]);
+
         view! {
             <input
                 id=format!("tile-{row}-{col}")
                 type="text"
-                prop:value=move || match t_sig.get().char {
+                prop:value=move || match t.get().char {
                     None => String::new(),
                     Some(byte) => (byte as char).to_string(),
                 }
@@ -213,7 +212,7 @@ pub fn App() -> impl IntoView {
                         font-bold uppercase outline-none cursor-pointer \
                         caret-transparent transition-colors focus:ring-4 \
                         focus:ring-black/20 selection:bg-transparent";
-                    let color = match t_sig.get().color {
+                    let color = match t.get().color {
                         None => "bg-white text-black",
                         Some(GuessColor::Gray) => "bg-wordle-gray text-white",
                         Some(GuessColor::Yellow) => "bg-wordle-yellow text-white",
@@ -281,15 +280,21 @@ pub fn App() -> impl IntoView {
                     format!("repeat({}, minmax(0, 1fr))", grid.read().cols)
                 }
             >
-                {move || {
-                    let g = grid.read();
-                    let (rows, cols) = (g.rows, g.cols);
-                    (0..rows)
-                        .map(|row| {
-                            (0..cols).map(|col| { get_tile_view(row, col) }).collect_view()
-                        })
-                        .collect_view()
-                }}
+
+                <For
+                    each=move || 0..grid.read().rows
+                    key=|row| *row
+                    children=move |row| {
+                        view! {
+                            <For
+                                each=move || 0..grid.read().cols
+                                key=|col| *col
+                                children=move |col| get_tile_view(row, col)
+                            />
+                        }
+                    }
+                />
+
             </div>
 
             <div>

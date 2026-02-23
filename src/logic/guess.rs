@@ -1,9 +1,8 @@
-use leptos::prelude::{Get, GetUntracked, ReadUntracked, RwSignal};
 use serde::{Deserialize, Serialize};
 
-use crate::frontend::app::{Grid, Tile};
+use crate::frontend::app::Grid;
 
-#[derive(Default, Clone, Copy, Serialize, Deserialize)]
+#[derive(Default, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub enum GuessColor {
     #[default]
     Gray,
@@ -23,22 +22,26 @@ pub struct Guesses {
     pub val: Vec<LetterGuess>,
 }
 
-impl Guesses {
-    // None if grid contains tile with no color or no character
-    pub fn from_grid(grid: &Grid) -> Option<Self> {
-        let word_len = grid.cols;
-        let val: Vec<LetterGuess> = grid
+impl TryFrom<&Grid> for Guesses {
+    type Error = ();
+
+    fn try_from(grid: &Grid) -> Result<Self, Self::Error> {
+        let val = grid
             .tiles
             .iter()
             .flatten()
-            .map(|signal| {
-                let tile = signal.read_untracked();
+            .map(|tile| {
                 Some(LetterGuess {
                     color: tile.color?,
                     char: tile.char?,
                 })
             })
-            .collect::<Option<Vec<LetterGuess>>>()?;
-        Some(Self { word_len, val })
+            .collect::<Option<Vec<_>>>()
+            .ok_or(())?;
+
+        Ok(Self {
+            word_len: grid.cols,
+            val,
+        })
     }
 }
