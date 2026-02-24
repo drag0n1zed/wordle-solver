@@ -122,15 +122,7 @@ pub fn App() -> impl IntoView {
 
         <Grid grid=grid />
 
-        <div>
-          <button
-            class="border-2 border-black p-2 px-6 font-bold uppercase bg-white hover:bg-black hover:text-white transition-colors h-[46px] disabled:opacity-50"
-            on:click=move |_| solve()
-            disabled=move || !is_solvable.get()
-          >
-            "Solve"
-          </button>
-        </div>
+        <SolveButton solve=solve is_solvable=is_solvable />
 
         <Solutions solved=solved all_solutions=all_solutions />
       </main>
@@ -208,36 +200,49 @@ fn Tile(grid: RwSignal<Grid>, row: usize, col: usize) -> impl IntoView {
     let cycle_status = move |_| {
         grid.update(|g| {
             let t = &mut g.tiles[row][col];
-            t.color = match t.color {
-                None => Some(GuessColor::Gray),
-                Some(GuessColor::Gray) => Some(GuessColor::Yellow),
-                Some(GuessColor::Yellow) => Some(GuessColor::Green),
-                Some(GuessColor::Green) => Some(GuessColor::Gray),
-            };
+            if t.char.is_some() {
+                t.color = match t.color {
+                    None => Some(GuessColor::Gray),
+                    Some(GuessColor::Gray) => Some(GuessColor::Yellow),
+                    Some(GuessColor::Yellow) => Some(GuessColor::Green),
+                    Some(GuessColor::Green) => Some(GuessColor::Gray),
+                };
+            }
         });
     };
 
     view! {
       <div
         class=move || {
-          let base = "w-12 h-12 sm:w-16 sm:h-16 border-2 border-black flex items-center justify-center \
-                            text-2xl sm:text-3xl font-bold uppercase cursor-pointer select-none transition-colors";
-          let color = match t.get().color {
-            None => "bg-white text-black",
-            Some(GuessColor::Gray) => "bg-wordle-gray text-white",
-            Some(GuessColor::Yellow) => "bg-wordle-yellow text-white",
-            Some(GuessColor::Green) => "bg-wordle-green text-white",
+          let base = "w-14 h-14 sm:w-16 sm:h-16 border-2 flex items-center justify-center \
+                      text-4xl font-bold uppercase cursor-pointer select-none transition-all \
+                      text-white hover:brightness-90 active:scale-95";
+          let state_style = match t.get().color {
+            Some(GuessColor::Green) => "bg-wordle-green",
+            Some(GuessColor::Yellow) => "bg-wordle-yellow",
+            Some(GuessColor::Gray) => "bg-wordle-gray",
+            None => "bg-white border-wordle-gray",
           };
-          format!("{base} {color}")
+          format!("{base} {state_style}")
         }
         on:click=cycle_status
       >
-        {move || {
-          t.get()
-            .char
-            .map(|byte| (byte as char).to_string())
-            .unwrap_or_default()
-        }}
+        {move || { t.get().char.map(|byte| (byte as char).to_string()).unwrap_or_default() }}
+      </div>
+    }
+}
+
+#[component]
+fn SolveButton(#[prop(into)] solve: Callback<()>, is_solvable: Memo<bool>) -> impl IntoView {
+    view! {
+      <div>
+        <button
+          class="border-2 border-black p-2 px-6 font-bold uppercase bg-white hover:bg-black hover:text-white transition-colors h-[46px] disabled:opacity-50"
+          on:click=move |_| solve.run(())
+          disabled=move || !is_solvable.get()
+        >
+          "Solve"
+        </button>
       </div>
     }
 }
@@ -253,11 +258,7 @@ fn Solutions(solved: RwSignal<bool>, all_solutions: RwSignal<Vec<&'static str>>)
           <p class="text-sm font-semibold mb-2">
             {move || {
               let count = all_solutions.with(|s| s.len());
-              format!(
-                "{} solution{} found",
-                count,
-                if count == 1 { "" } else { "s" },
-              )
+              format!("{} solution{} found", count, if count == 1 { "" } else { "s" })
             }}
           </p>
 
