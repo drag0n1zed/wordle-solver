@@ -91,7 +91,11 @@ pub fn App() -> impl IntoView {
                 let pos = cursor.get_untracked();
                 if pos > 0 {
                     let new_pos = pos - 1;
-                    grid.update(|g| g.tiles[new_pos / g.cols][new_pos % g.cols].char = None);
+                    grid.update(|g| {
+                        let t = &mut g.tiles[new_pos / g.cols][new_pos % g.cols];
+                        t.char = None;
+                        t.color = None;
+                    });
                     cursor.set(new_pos);
                 }
             }
@@ -117,8 +121,11 @@ pub fn App() -> impl IntoView {
     });
 
     view! {
-      <main class="flex flex-col items-center justify-center min-h-screen gap-6 py-8">
-        <Settings grid=grid on_resize=resize_grid />
+      <main class="flex flex-col items-center min-h-screen gap-6 py-8">
+
+        <div class="h-[10vh]"></div>
+
+        <Settings grid=grid resize_grid=resize_grid />
 
         <Grid grid=grid />
 
@@ -130,7 +137,10 @@ pub fn App() -> impl IntoView {
 }
 
 #[component]
-fn Settings(grid: RwSignal<Grid>, #[prop(into)] on_resize: Callback<(Option<usize>, Option<usize>)>) -> impl IntoView {
+fn Settings(
+    grid: RwSignal<Grid>,
+    #[prop(into)] resize_grid: Callback<(Option<usize>, Option<usize>)>,
+) -> impl IntoView {
     view! {
       <div class="flex items-center gap-6">
         <label class="flex items-center gap-2">
@@ -141,7 +151,7 @@ fn Settings(grid: RwSignal<Grid>, #[prop(into)] on_resize: Callback<(Option<usiz
             prop:value=move || grid.read().rows
             on:change=move |e| {
               if let Ok(val) = event_target_value(&e).parse::<usize>() {
-                on_resize.run((Some(val), None));
+                resize_grid.run((Some(val), None));
               }
             }
           />
@@ -155,7 +165,7 @@ fn Settings(grid: RwSignal<Grid>, #[prop(into)] on_resize: Callback<(Option<usiz
             prop:value=move || grid.read().cols
             on:change=move |e| {
               if let Ok(val) = event_target_value(&e).parse::<usize>() {
-                on_resize.run((None, Some(val)));
+                resize_grid.run((None, Some(val)));
               }
             }
           />
