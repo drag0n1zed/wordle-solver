@@ -187,10 +187,9 @@ fn Grid(grid: RwSignal<Grid>) -> impl IntoView {
           each=move || 0..grid.read().rows
           key=|row| *row
           children=move |row| {
-            let cols = grid.read().cols;
             view! {
               <For
-                each=move || 0..cols
+                each=move || 0..grid.read().cols
                 key=|col| *col
                 children=move |col| {
                   view! { <Tile grid=grid row=row col=col /> }
