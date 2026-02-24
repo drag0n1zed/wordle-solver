@@ -120,7 +120,7 @@ pub fn App() -> impl IntoView {
       <main class="flex flex-col items-center justify-center min-h-screen gap-6 py-8">
         <Settings grid=grid on_resize=resize_grid />
 
-        <WordleGrid grid=grid />
+        <Grid grid=grid />
 
         <div>
           <button
@@ -132,7 +132,7 @@ pub fn App() -> impl IntoView {
           </button>
         </div>
 
-        <SolutionsView solved=solved all_solutions=all_solutions />
+        <Solutions solved=solved all_solutions=all_solutions />
       </main>
     }
 }
@@ -173,7 +173,7 @@ fn Settings(grid: RwSignal<Grid>, #[prop(into)] on_resize: Callback<(Option<usiz
 }
 
 #[component]
-fn WordleGrid(grid: RwSignal<Grid>) -> impl IntoView {
+fn Grid(grid: RwSignal<Grid>) -> impl IntoView {
     view! {
       <div
         class="grid gap-2"
@@ -191,7 +191,7 @@ fn WordleGrid(grid: RwSignal<Grid>) -> impl IntoView {
                 each=move || 0..cols
                 key=|col| *col
                 children=move |col| {
-                  view! { <TileView grid=grid row=row col=col /> }
+                  view! { <Tile grid=grid row=row col=col /> }
                 }
               />
             }
@@ -202,7 +202,7 @@ fn WordleGrid(grid: RwSignal<Grid>) -> impl IntoView {
 }
 
 #[component]
-fn TileView(grid: RwSignal<Grid>, row: usize, col: usize) -> impl IntoView {
+fn Tile(grid: RwSignal<Grid>, row: usize, col: usize) -> impl IntoView {
     let t = Memo::new(move |_| grid.read().tiles[row][col]);
 
     let cycle_status = move |_| {
@@ -243,8 +243,9 @@ fn TileView(grid: RwSignal<Grid>, row: usize, col: usize) -> impl IntoView {
 }
 
 #[component]
-fn SolutionsView(solved: RwSignal<bool>, all_solutions: RwSignal<Vec<&'static str>>) -> impl IntoView {
+fn Solutions(solved: RwSignal<bool>, all_solutions: RwSignal<Vec<&'static str>>) -> impl IntoView {
     let scroll_ref = NodeRef::<Div>::new();
+    let count = Memo::new(move |_| all_solutions.read().len());
 
     view! {
       <Show when=move || solved.get()>
@@ -260,38 +261,37 @@ fn SolutionsView(solved: RwSignal<bool>, all_solutions: RwSignal<Vec<&'static st
             }}
           </p>
 
-          <div class="empty:hidden">
-            {move || {
-              (all_solutions.with(|s| s.is_empty()))
-                .then(|| {
-                  view! {
-                    <p class="text-sm text-gray-500">
-                      "No matching words. Check for contradictions."
-                    </p>
-                  }
-                })
-            }}
-          </div>
-
-          <div
-            node_ref=scroll_ref
-            class="overflow-y-auto max-h-[40vh] border-2 border-black bg-white"
+          <Show
+            when=move || { count.get() > 0 }
+            fallback=|| {
+              view! {
+                <p class="text-sm text-gray-500 italic">
+                  "No matching words found. Check for contradictions."
+                </p>
+              }
+            }
           >
 
-            <div class="flex flex-wrap gap-2 p-3">
-              <For
-                each=move || { all_solutions.get().into_iter() }
-                key=|word| *word
-                children=|word| {
-                  view! {
-                    <span class="bg-gray-200 px-3 py-1 text-sm font-semibold tracking-wider uppercase">
-                      {word}
-                    </span>
+            <div
+              node_ref=scroll_ref
+              class="overflow-y-auto max-h-[40vh] border-2 border-black bg-white"
+            >
+
+              <div class="flex flex-wrap gap-2 p-3">
+                <For
+                  each=move || { all_solutions.get().into_iter() }
+                  key=|word| *word
+                  children=|word| {
+                    view! {
+                      <span class="bg-gray-200 px-3 py-1 text-sm font-semibold tracking-wider uppercase">
+                        {word}
+                      </span>
+                    }
                   }
-                }
-              />
+                />
+              </div>
             </div>
-          </div>
+          </Show>
         </div>
       </Show>
     }
