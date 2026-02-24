@@ -1,9 +1,9 @@
 use std::path::Path;
 
 use include_dir::{Dir, include_dir};
-use leptos::prelude::*;
+use leptos::{ev::keydown, prelude::*};
 use wasm_bindgen::JsCast;
-use web_sys::HtmlInputElement;
+use web_sys::{HtmlInputElement, KeyboardEvent};
 
 use crate::logic::{
     guess::{GuessColor, Guesses},
@@ -43,6 +43,7 @@ impl Grid {
 #[component]
 pub fn App() -> impl IntoView {
     let grid = RwSignal::new(Grid::new(3, 5));
+    let cursor = RwSignal::new(0);
 
     let resize_grid = move |new_rows: Option<usize>, new_cols: Option<usize>| {
         grid.update(|g| {
@@ -53,6 +54,8 @@ pub fn App() -> impl IntoView {
                 row.resize(g.cols, Tile::default());
             }
         });
+        let new_total = grid.with_untracked(|g| g.rows * g.cols);
+        cursor.update(|c| *c = new_total.min(*c));
     };
 
     let wordlist = get_str_asset("data/enable1.txt").expect("wordlist load failed");
@@ -77,110 +80,53 @@ pub fn App() -> impl IntoView {
         display_count.set(20);
     };
 
-    enum MoveDir {
-        Left,
-        Right,
-        Down,
-        Up,
-    }
-
-    let focus_by_grid_coords = move |row: usize, col: usize| {
-        if let Some(elem) = document().get_element_by_id(format!("tile-{row}-{col}").as_str()) {
-            if let Ok(input) = elem.dyn_into::<HtmlInputElement>() {
-                let _ = input.focus();
-            }
+    window_event_listener(keydown, move |e: KeyboardEvent| {
+        if document()
+            .active_element()
+            .and_then(|elem| elem.dyn_into::<HtmlInputElement>().ok())
+            .is_some()
+        {
+            return;
         }
-    };
 
-    let focus_after_moving = move |dir: MoveDir, row: usize, col: usize| {
-        let (total_rows, total_cols) = {
-            let g = grid.read();
-            (g.rows, g.cols)
-        };
-        match dir {
-            MoveDir::Left => {
-                if col > 0 {
-                    focus_by_grid_coords(row, col - 1);
-                } else if row > 0 {
-                    focus_by_grid_coords(row - 1, total_cols - 1);
+        let key = e.key();
+        match key.as_str() {
+            "Backspace" => {
+                e.prevent_default();
+                let pos = cursor.get_untracked();
+                if pos > 0 {
+                    let new_pos = pos - 1;
+                    grid.update(|g| {
+                        let row = new_pos / g.cols;
+                        let col = new_pos % g.cols;
+                        g.tiles[row][col].char = None;
+                    });
+                    cursor.set(new_pos);
                 }
             }
-            MoveDir::Right => {
-                if col + 1 < total_cols {
-                    focus_by_grid_coords(row, col + 1);
-                } else if row + 1 < total_rows {
-                    focus_by_grid_coords(row + 1, 0);
+            k if k.len() == 1 => {
+                let char = k.chars().next().unwrap();
+                if char.is_ascii_alphabetic() {
+                    let total = grid.with_untracked(|g| g.rows * g.cols);
+                    let pos = cursor.get_untracked();
+                    let write_pos = pos.min(total - 1); // doesn't move past final input
+                    grid.update(|g| {
+                        let row = write_pos / g.cols;
+                        let col = write_pos % g.cols;
+                        let t = &mut g.tiles[row][col];
+                        if t.char.is_none() {
+                            t.color = Some(GuessColor::Gray);
+                        }
+                        t.char = Some(char.to_ascii_uppercase() as u8);
+                    });
+                    if pos < total {
+                        cursor.set(pos + 1);
+                    }
                 }
             }
-            MoveDir::Up => {
-                if row > 0 {
-                    focus_by_grid_coords(row - 1, col);
-                }
-            }
-            MoveDir::Down => {
-                if row + 1 < total_rows {
-                    focus_by_grid_coords(row + 1, col);
-                }
-            }
+            _ => {}
         }
-    };
-
-    let handle_input = move |event: web_sys::Event, row: usize, col: usize| {
-        let target: HtmlInputElement = event_target(&event);
-        let val = target.value();
-
-        let current_char = grid.with_untracked(|g| g.tiles[row][col].char.map(|b| b as char));
-        let new_char = val
-            .chars()
-            .find(|&c| Some(c) != current_char)
-            .filter(|c| c.is_ascii_alphabetic());
-
-        if let Some(char) = new_char {
-            grid.update(|g| {
-                let t = &mut g.tiles[row][col];
-                if t.char.is_none() {
-                    t.color = Some(GuessColor::Gray);
-                }
-                t.char = Some(char.to_ascii_uppercase() as u8);
-            });
-            focus_after_moving(MoveDir::Right, row, col);
-        } else {
-            // Manually refresh DOM. Stops non-alphanumeric characters from being appended
-            let orig_char = match current_char {
-                None => String::new(),
-                Some(byte) => (byte as char).to_string(),
-            };
-            target.set_value(&orig_char);
-        }
-    };
-
-    let handle_keydown = move |event: web_sys::KeyboardEvent, row: usize, col: usize| {
-        grid.update(|g| {
-            let t = &mut g.tiles[row][col];
-            match event.key().as_str() {
-                " " => {
-                    t.char = None;
-                }
-                "Backspace" => {
-                    t.char = None;
-                    focus_after_moving(MoveDir::Left, row, col);
-                }
-                "ArrowLeft" => {
-                    focus_after_moving(MoveDir::Left, row, col);
-                }
-                "ArrowRight" => {
-                    focus_after_moving(MoveDir::Right, row, col);
-                }
-                "ArrowUp" => {
-                    focus_after_moving(MoveDir::Up, row, col);
-                }
-                "ArrowDown" => {
-                    focus_after_moving(MoveDir::Down, row, col);
-                }
-                _ => {}
-            }
-        });
-    };
+    });
 
     let cycle_status = move |row: usize, col: usize| {
         grid.update(|g| {
@@ -199,19 +145,12 @@ pub fn App() -> impl IntoView {
         let t = Memo::new(move |_| grid.read().tiles[row][col]);
 
         view! {
-            <input
-                id=format!("tile-{row}-{col}")
-                type="text"
-                prop:value=move || match t.get().char {
-                    None => String::new(),
-                    Some(byte) => (byte as char).to_string(),
-                }
+            <div
                 class=move || {
                     let base = "w-12 h-12 sm:w-16 sm:h-16 \
-                        border-2 border-black text-center text-2xl sm:text-3xl \
-                        font-bold uppercase outline-none cursor-pointer \
-                        caret-transparent transition-colors focus:ring-4 \
-                        focus:ring-black/20 selection:bg-transparent";
+                        border-2 border-black flex items-center justify-center \
+                        text-2xl sm:text-3xl font-bold uppercase cursor-pointer \
+                        transition-colors select-none";
                     let color = match t.get().color {
                         None => "bg-white text-black",
                         Some(GuessColor::Gray) => "bg-wordle-gray text-white",
@@ -220,14 +159,13 @@ pub fn App() -> impl IntoView {
                     };
                     format!("{base} {color}")
                 }
-                on:focus=move |e| {
-                    let _ = event_target::<HtmlInputElement>(&e).select();
-                }
-                on:input=move |e| handle_input(e, row, col)
-                on:keydown=move |e| handle_keydown(e, row, col)
                 on:click=move |_| cycle_status(row, col)
-                autocomplete="off"
-            />
+            >
+                {move || match t.get().char {
+                    None => String::new(),
+                    Some(byte) => (byte as char).to_string(),
+                }}
+            </div>
         }
     };
 
