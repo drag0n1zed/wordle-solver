@@ -1,5 +1,5 @@
 use include_dir::{Dir, include_dir};
-use leptos::{ev::keydown, html::Div, prelude::*};
+use leptos::prelude::*;
 use std::path::Path;
 use wasm_bindgen::JsCast;
 use web_sys::{HtmlInputElement, KeyboardEvent};
@@ -76,7 +76,7 @@ pub fn App() -> impl IntoView {
     let is_solvable =
         Memo::new(move |_| grid.with(|g| g.tiles.iter().flatten().all(|t| t.char.is_some() && t.color.is_some())));
 
-    window_event_listener(keydown, move |e: KeyboardEvent| {
+    window_event_listener(leptos::ev::keydown, move |e: KeyboardEvent| {
         if document()
             .active_element()
             .and_then(|el| el.dyn_into::<HtmlInputElement>().ok())
@@ -259,7 +259,7 @@ fn SolveButton(#[prop(into)] solve: Callback<()>, is_solvable: Memo<bool>) -> im
 
 #[component]
 fn Solutions(solved: RwSignal<bool>, all_solutions: RwSignal<Vec<&'static str>>) -> impl IntoView {
-    let scroll_ref = NodeRef::<Div>::new();
+    let scroll_ref = NodeRef::<leptos::html::Div>::new();
     let count = Memo::new(move |_| all_solutions.read().len());
 
     view! {
