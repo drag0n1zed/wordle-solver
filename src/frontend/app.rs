@@ -55,14 +55,18 @@ pub fn App() -> impl IntoView {
             }
             if let Some(c) = new_cols {
                 g.cols = c;
+                g.tiles = vec![vec![Tile::default(); g.cols]; g.rows];
+                cursor.set(0);
             }
             g.tiles.resize(g.rows, vec![Tile::default(); g.cols]);
             for row in g.tiles.iter_mut() {
                 row.resize(g.cols, Tile::default());
             }
         });
-        let new_total = grid.with_untracked(|g| g.rows * g.cols);
-        cursor.update(|c| *c = new_total.min(*c));
+        if new_cols.is_none() {
+            let new_total = grid.with_untracked(|g| g.rows * g.cols);
+            cursor.update(|c| *c = new_total.min(*c));
+        }
     };
 
     let solve = move || {
@@ -137,7 +141,7 @@ pub fn App() -> impl IntoView {
 }
 
 #[component]
-fn NumberStepper(
+fn NumberCounter(
     value: Signal<usize>,
     #[prop(into)] on_change: Callback<usize>,
     #[prop(default = 1)] min: usize,
@@ -175,14 +179,14 @@ fn Settings(
       <div class="flex items-center gap-6">
         <div class="flex items-center gap-2">
           "Guess count: "
-          <NumberStepper
+          <NumberCounter
             value=Signal::derive(move || grid.read().rows)
             on_change=move |v| resize_grid.run((Some(v), None))
           />
         </div>
         <div class="flex items-center gap-2">
           "Word length: "
-          <NumberStepper
+          <NumberCounter
             value=Signal::derive(move || grid.read().cols)
             on_change=move |v| resize_grid.run((None, Some(v)))
           />
