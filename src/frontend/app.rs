@@ -314,7 +314,7 @@ fn Solutions(solved: RwSignal<bool>, all_solutions: RwSignal<Vec<&'static str>>)
                   key=|word| *word
                   children=|word| {
                     view! {
-                      <span class="bg-gray-200 px-3 py-1 text-sm font-semibold tracking-wider uppercase">
+                      <span class="font-mono bg-gray-200 px-3 py-1 text-base font-semibold tracking-wider uppercase">
                         {word}
                       </span>
                     }
