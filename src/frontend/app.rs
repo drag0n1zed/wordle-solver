@@ -308,7 +308,7 @@ fn Solutions(solved: RwSignal<bool>, all_solutions: RwSignal<Vec<&'static str>>)
               class="overflow-y-auto max-h-[40vh] border-2 border-black bg-white"
             >
 
-              <div class="flex flex-wrap gap-2 p-3">
+              <div class="flex flex-wrap gap-2 p-3 justify-center">
                 <For
                   each=move || { all_solutions.get().into_iter() }
                   key=|word| *word
