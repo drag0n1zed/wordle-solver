@@ -292,7 +292,6 @@ fn SolutionButton(word: &'static str) -> impl IntoView {
         type="button"
         class="font-mono antialiased bg-gray-200 px-3 py-1 text-base font-semibold tracking-wider uppercase hover:brightness-90 active:scale-95"
         on:click={
-          let copy = copy.clone();
           move |_| copy(word.to_ascii_uppercase().as_str())
         }
       >
