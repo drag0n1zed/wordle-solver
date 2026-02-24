@@ -137,39 +137,56 @@ pub fn App() -> impl IntoView {
 }
 
 #[component]
+fn NumberStepper(
+    value: Signal<usize>,
+    #[prop(into)] on_change: Callback<usize>,
+    #[prop(default = 1)] min: usize,
+) -> impl IntoView {
+    view! {
+      <div class="flex items-center border-2 border-black">
+        <button
+          class="px-3 py-1 font-bold bg-white hover:bg-black hover:text-white transition-colors select-none active:scale-95"
+          on:click=move |_| {
+            let v = value.get();
+            if v > min {
+              on_change.run(v - 1);
+            }
+          }
+        >
+          "-"
+        </button>
+        <span class="w-8 text-center font-bold">{move || value.get()}</span>
+        <button
+          class="px-3 py-1 font-bold bg-white hover:bg-black hover:text-white transition-colors select-none active:scale-95"
+          on:click=move |_| on_change.run(value.get() + 1)
+        >
+          "+"
+        </button>
+      </div>
+    }
+}
+
+#[component]
 fn Settings(
     grid: RwSignal<Grid>,
     #[prop(into)] resize_grid: Callback<(Option<usize>, Option<usize>)>,
 ) -> impl IntoView {
     view! {
       <div class="flex items-center gap-6">
-        <label class="flex items-center gap-2">
+        <div class="flex items-center gap-2">
           "Guess count: "
-          <input
-            type="number"
-            class="border border-gray-300 p-1 w-16"
-            prop:value=move || grid.read().rows
-            on:change=move |e| {
-              if let Ok(val) = event_target_value(&e).parse::<usize>() {
-                resize_grid.run((Some(val), None));
-              }
-            }
+          <NumberStepper
+            value=Signal::derive(move || grid.read().rows)
+            on_change=move |v| resize_grid.run((Some(v), None))
           />
-        </label>
-
-        <label class="flex items-center gap-2">
+        </div>
+        <div class="flex items-center gap-2">
           "Word length: "
-          <input
-            type="number"
-            class="border border-gray-300 p-1 w-16"
-            prop:value=move || grid.read().cols
-            on:change=move |e| {
-              if let Ok(val) = event_target_value(&e).parse::<usize>() {
-                resize_grid.run((None, Some(val)));
-              }
-            }
+          <NumberStepper
+            value=Signal::derive(move || grid.read().cols)
+            on_change=move |v| resize_grid.run((None, Some(v)))
           />
-        </label>
+        </div>
       </div>
     }
 }
@@ -246,7 +263,7 @@ fn SolveButton(#[prop(into)] solve: Callback<()>, is_solvable: Memo<bool>) -> im
     view! {
       <div>
         <button
-          class="border-2 border-black p-2 px-6 font-bold uppercase bg-white hover:bg-black hover:text-white transition-colors h-[46px] disabled:opacity-50"
+          class="border-2 border-black p-2 px-6 font-bold uppercase bg-white hover:bg-black hover:text-white transition-colors h-[46px] disabled:opacity-50 active:scale-95"
           on:click=move |_| solve.run(())
           disabled=move || !is_solvable.get()
         >
