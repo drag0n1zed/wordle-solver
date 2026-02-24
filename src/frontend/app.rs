@@ -1,5 +1,6 @@
 use include_dir::{Dir, include_dir};
 use leptos::prelude::*;
+use leptos_use::{UseClipboardOptions, UseClipboardReturn};
 use std::path::Path;
 use wasm_bindgen::JsCast;
 use web_sys::{HtmlInputElement, KeyboardEvent};
@@ -282,6 +283,30 @@ fn SolveButton(#[prop(into)] solve: Callback<()>, is_solvable: Memo<bool>) -> im
 }
 
 #[component]
+fn SolutionButton(word: &'static str) -> impl IntoView {
+    let UseClipboardReturn { copy, copied, .. } =
+        leptos_use::use_clipboard_with_options(UseClipboardOptions::default().copied_reset_delay(750.0));
+
+    view! {
+      <button
+        type="button"
+        class="font-mono antialiased bg-gray-200 px-3 py-1 text-base font-semibold tracking-wider uppercase hover:brightness-90 active:scale-95"
+        on:click={
+          let copy = copy.clone();
+          move |_| copy(word.to_ascii_uppercase().as_str())
+        }
+      >
+        <Show
+          when=move || copied.get()
+          fallback=move || view! {<span>{word}</span>}
+        >
+          <span class="text-green-700">"Copied!"</span>
+        </Show>
+      </button>
+    }
+}
+
+#[component]
 fn Solutions(solved: RwSignal<bool>, all_solutions: RwSignal<Vec<&'static str>>) -> impl IntoView {
     let scroll_ref = NodeRef::<leptos::html::Div>::new();
     let count = Memo::new(move |_| all_solutions.read().len());
@@ -306,21 +331,17 @@ fn Solutions(solved: RwSignal<bool>, all_solutions: RwSignal<Vec<&'static str>>)
               }
             }
           >
-
             <div
               node_ref=scroll_ref
               class="overflow-y-auto max-h-[40vh] border-2 border-black bg-white"
             >
-
               <div class="flex flex-wrap gap-2 p-3 justify-center">
                 <For
                   each=move || { all_solutions.get().into_iter() }
                   key=|word| *word
                   children=|word| {
                     view! {
-                      <span class="font-mono antialiased bg-gray-200 px-3 py-1 text-base font-semibold tracking-wider uppercase">
-                        {word}
-                      </span>
+                      <SolutionButton word=word />
                     }
                   }
                 />
