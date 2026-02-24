@@ -103,6 +103,9 @@ pub fn App() -> impl IntoView {
                     cursor.set(new_pos);
                 }
             }
+            "Space" => {
+                e.prevent_default();
+            }
             k if k.len() == 1 && k.chars().next().unwrap().is_ascii_alphabetic() => {
                 let char = k.chars().next().unwrap().to_ascii_uppercase() as u8;
                 let total = grid.with_untracked(|g| g.rows * g.cols);
@@ -314,7 +317,7 @@ fn Solutions(solved: RwSignal<bool>, all_solutions: RwSignal<Vec<&'static str>>)
                   key=|word| *word
                   children=|word| {
                     view! {
-                      <span class="font-mono bg-gray-200 px-3 py-1 text-base font-semibold tracking-wider uppercase">
+                      <span class="font-mono antialiased bg-gray-200 px-3 py-1 text-base font-semibold tracking-wider uppercase">
                         {word}
                       </span>
                     }
