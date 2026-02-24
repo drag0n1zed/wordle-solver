@@ -103,9 +103,6 @@ pub fn App() -> impl IntoView {
                     cursor.set(new_pos);
                 }
             }
-            "Space" => {
-                e.prevent_default();
-            }
             k if k.len() == 1 && k.chars().next().unwrap().is_ascii_alphabetic() => {
                 let char = k.chars().next().unwrap().to_ascii_uppercase() as u8;
                 let total = grid.with_untracked(|g| g.rows * g.cols);
@@ -153,11 +150,12 @@ fn NumberCounter(
       <div class="flex items-center border-2 border-black">
         <button
           class="px-3 py-1 font-bold bg-white hover:bg-black hover:text-white transition-colors select-none active:scale-95"
-          on:click=move |_| {
+          on:click=move |e| {
             let v = value.get();
             if v > min {
               on_change.run(v - 1);
             }
+            let _ = e.target().unwrap().unchecked_into::<web_sys::HtmlElement>().blur();
           }
         >
           "-"
@@ -165,7 +163,10 @@ fn NumberCounter(
         <span class="w-8 text-center font-bold">{move || value.get()}</span>
         <button
           class="px-3 py-1 font-bold bg-white hover:bg-black hover:text-white transition-colors select-none active:scale-95"
-          on:click=move |_| on_change.run(value.get() + 1)
+          on:click=move |e| {
+            on_change.run(value.get() + 1);
+            let _ = e.target().unwrap().unchecked_into::<web_sys::HtmlElement>().blur();
+          }
         >
           "+"
         </button>
