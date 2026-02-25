@@ -16,8 +16,7 @@ fn get_str_asset<S>(path: S) -> Option<&'static str>
 where
     S: AsRef<Path>,
 {
-    let bytes = ASSETS.get_file(path)?.contents();
-    std::str::from_utf8(bytes).ok()
+    ASSETS.get_file(path)?.contents_utf8()
 }
 
 #[derive(Default, PartialEq, Clone, Copy)]
@@ -291,14 +290,9 @@ fn SolutionButton(word: &'static str) -> impl IntoView {
       <button
         type="button"
         class="font-mono antialiased bg-gray-200 px-3 py-1 text-base font-semibold tracking-wider uppercase hover:brightness-90 active:scale-95"
-        on:click={
-          move |_| copy(word.to_ascii_uppercase().as_str())
-        }
+        on:click=move |_| copy(word.to_ascii_uppercase().as_str())
       >
-        <Show
-          when=move || copied.get()
-          fallback=move || view! {<span>{word}</span>}
-        >
+        <Show when=move || copied.get() fallback=move || view! { <span>{word}</span> }>
           <span class="text-green-700">"Copied!"</span>
         </Show>
       </button>
@@ -339,9 +333,7 @@ fn Solutions(solved: RwSignal<bool>, all_solutions: RwSignal<Vec<&'static str>>)
                   each=move || { all_solutions.get().into_iter() }
                   key=|word| *word
                   children=|word| {
-                    view! {
-                      <SolutionButton word=word />
-                    }
+                    view! { <SolutionButton word=word /> }
                   }
                 />
               </div>
