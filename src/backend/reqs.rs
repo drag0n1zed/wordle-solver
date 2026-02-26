@@ -1,4 +1,4 @@
-use crate::logic::guess::{GuessColor, Guesses, LetterGuess};
+use super::guess::{GuessColor, Guesses, LetterGuess};
 
 pub struct Requirement {
     word_len: usize,                   // Word length
@@ -74,8 +74,17 @@ impl Requirement {
         }
         true
     }
+}
 
-    pub fn filter_wordlist<'a>(&self, wordlist: &'a str) -> impl Iterator<Item = &'a str> {
-        wordlist.lines().filter(|word| self.applies_to(word))
+pub trait WordlistFilter<'a>: Iterator<Item = &'a str> + Sized {
+    fn filter_wordlist(self, reqs: &Requirement) -> impl Iterator<Item = &'a str>;
+}
+
+impl<'a, I> WordlistFilter<'a> for I
+where
+    I: Iterator<Item = &'a str>,
+{
+    fn filter_wordlist(self, reqs: &Requirement) -> impl Iterator<Item = &'a str> {
+        self.filter(|word| reqs.applies_to(word))
     }
 }

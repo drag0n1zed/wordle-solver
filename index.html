@@ -6,13 +6,13 @@
 
         <base data-trunk-public-url />
 
-        <link data-trunk rel="tailwind-css-extra" href="input.css" />
         <link
             data-trunk
             rel="rust"
-            href="Cargo.toml"
             data-wasm-opt="z"
             data-wasm-opt-params="--enable-bulk-memory --enable-nontrapping-float-to-int"
         />
+        <link data-trunk rel="tailwind-css-extra" href="input.css" />
+        <link data-trunk rel="copy-dir" href="assets/" />
     </head>
 </html>

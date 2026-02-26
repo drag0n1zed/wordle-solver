@@ -3,18 +3,16 @@ name = "wordle-solver"
 version = "0.1.0"
 edition = "2024"
 
-
 [dependencies]
+console_error_panic_hook = "0.1"
+gloo-net = { version = "0.6", features = ['http'] }
 leptos = { version = "0.8", features = ["csr"] }
 leptos-use = "0.18"
-wasm-bindgen = "0.2"
-web-sys = { version = "0.3.4", features = [ "Window", "Document", "HtmlElement", "Text", "HtmlInputElement" ] }
-console_error_panic_hook = "0.1"
-
-include_dir = "0.7"
-
 serde = { version = "1.0", features = [ "derive" ] }
 serde_json = "1.0"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+web-sys = { version = "0.3.4", features = [ "Window", "Document", "HtmlElement", "Text", "HtmlInputElement" ] }
 
 [profile.release]
 opt-level = 'z'

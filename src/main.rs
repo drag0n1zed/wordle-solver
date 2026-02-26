@@ -1,5 +1,5 @@
+mod backend;
 mod frontend;
-mod logic;
 
 use leptos::prelude::*;
 use wasm_bindgen::prelude::*;
