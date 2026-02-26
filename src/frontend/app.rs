@@ -25,8 +25,8 @@ pub fn App() -> impl IntoView {
     let solved = RwSignal::new(false);
 
     let wordlists = RwSignal::new(vec![
-        wordlist::fetch("Common Words", WordlistSource::Url("/assets/popular.txt"), false),
-        wordlist::fetch("All Words", WordlistSource::Url("/assets/enable1.txt"), false),
+        wordlist::fetch("Common Words", WordlistSource::Url("assets/popular.txt"), false),
+        wordlist::fetch("All Words", WordlistSource::Url("assets/enable1.txt"), false),
     ]);
 
     let resize_grid = move |new_rows: Option<usize>, new_cols: Option<usize>| {
